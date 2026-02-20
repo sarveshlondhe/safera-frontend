@@ -8,9 +8,7 @@ export default function Alerts() {
   const user = getUser();
   const [tab, setTab] = useState("All");
   const [broadcasts, setBroadcasts] = useState([]);
-
   const c = { bg: "#0f0f13", card: "#1a1a24", border: "#2d2d38", muted: "#8e8e93", red: "#ff3b30", pill: "#121218" };
-
   // Load admin broadcasts from DB
   useEffect(() => {
     broadcastAPI.getAll().then((res) => setBroadcasts(res.broadcasts || [])).catch(() => {});
