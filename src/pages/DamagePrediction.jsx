@@ -1,188 +1,218 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Zap, Flame, Waves, Wind, Activity, CheckCircle } from "lucide-react";
+import { ChevronLeft, Zap, Flame, Waves, Wind, Activity, Brain, CheckCircle } from "lucide-react";
+import { getUser } from "../api.js";
 
-const c = { bg: "#0f0f13", card: "#1a1a24", border: "#2d2d38", muted: "#8e8e93", red: "#ff3b30", pill: "#121218" };
+const c = { bg:"#0f0f13",card:"#1a1a24",border:"#2d2d38",muted:"#8e8e93",red:"#ff3b30",pill:"#121218",green:"#30D158",gold:"#FF9F0A",blue:"#0A84FF" };
 
 const BUILDINGS = [
-  { name: "COE Engineering College",     floors: 4, age: 25, material: "RCC",  emoji: "🏫" },
-  { name: "IOIT College",                floors: 4, age: 20, material: "RCC",  emoji: "🏛️" },
-  { name: "Pharmacy College",            floors: 3, age: 18, material: "RCC",  emoji: "🏥" },
-  { name: "Polytechnic College",         floors: 3, age: 22, material: "RCC",  emoji: "🔧" },
-  { name: "Sports Ground (Shivgarjana)", floors: 1, age: 30, material: "Open", emoji: "🏟️" },
-  { name: "Basketball Court",            floors: 1, age: 15, material: "Open", emoji: "🏀" },
+  { name:"COE Engineering College", floors:4, emoji:"🏫" },
+  { name:"IOIT College",            floors:4, emoji:"🏛️" },
+  { name:"Pharmacy College",        floors:3, emoji:"🏥" },
+  { name:"Polytechnic College",     floors:3, emoji:"🔧" },
+  { name:"Sports Ground",           floors:1, emoji:"🏟️" },
+  { name:"Basketball Court",        floors:1, emoji:"🏀" },
 ];
 
-const DISASTERS = [
-  { key: "Fire",       icon: <Flame    size={20} />, color: "#ff6b35" },
-  { key: "Earthquake", icon: <Activity size={20} />, color: "#ff3b30" },
-  { key: "Flood",      icon: <Waves    size={20} />, color: "#0a84ff" },
-  { key: "Cyclone",    icon: <Wind     size={20} />, color: "#5e5ce6" },
+const TYPES = [
+  { key:"Earthquake", icon:<Activity size={18}/> },
+  { key:"Fire",       icon:<Flame    size={18}/> },
+  { key:"Flood",      icon:<Waves    size={18}/> },
+  { key:"Cyclone",    icon:<Wind     size={18}/> },
 ];
 
-const calcRisk = ({ disaster, magnitude, buildingName, floors, age, material, occupants }) => {
-  let score = (magnitude / 10) * 35;
-  score += age > 30 ? 20 : age > 15 ? 10 : 4;
-  score += material === "RCC" ? 8 : material === "Open" ? 1 : 22;
-  score += floors > 3 ? 12 : floors > 1 ? 6 : 1;
-  score += occupants > 500 ? 10 : occupants > 200 ? 6 : occupants > 100 ? 3 : 0;
-  if (disaster === "Earthquake") score *= 1.2;
-  if (disaster === "Fire")       score *= 1.1;
-  if (disaster === "Flood" && material === "Open") score *= 1.5;
-  if (disaster === "Cyclone")    score *= 1.05;
-  score = Math.min(100, Math.round(score));
+function calcDamage(disaster, magnitude, floors) {
+  let base = magnitude * 10;
+  if(disaster==="Earthquake") base*=1.2;
+  if(disaster==="Fire")       base*=0.9;
+  if(disaster==="Flood")      base*=0.8;
+  base += floors * 3;
+  return Math.min(98, Math.max(5, Math.round(base)));
+}
 
-  if (score >= 75) return { score, level: "CRITICAL",  color: "#ff3b30", bg: "#ff3b3018", action: "🚨 Immediate evacuation! Alert campus security NOW." };
-  if (score >= 50) return { score, level: "HIGH RISK", color: "#ff9f0a", bg: "#ff9f0a18", action: "⚠️ Evacuate within 10 minutes. Notify NSS coordinator." };
-  if (score >= 25) return { score, level: "MODERATE",  color: "#ffd60a", bg: "#ffd60a18", action: "🔶 Stay alert. Follow campus safety protocols." };
-  return              { score, level: "LOW RISK",  color: "#30d158", bg: "#30d15818", action: "✅ Monitor situation. No immediate action needed." };
-};
+function predictNeeds(disaster, magnitude, name, floors, dmg) {
+  const needs = [];
+  if(dmg>30) needs.push({ need:"🚑 Medical Aid & First Aid",      priority:"CRITICAL", reason:"Injuries expected from structural impact" });
+  if(dmg>20) needs.push({ need:"🍱 Food & Drinking Water",        priority:dmg>60?"CRITICAL":"HIGH", reason:"Displaced people need sustenance" });
+  if(disaster==="Earthquake") {
+    if(dmg>40) needs.push({ need:"🔦 Search & Rescue Teams",      priority:"CRITICAL", reason:"Collapsed structures may have trapped survivors" });
+    if(dmg>50) needs.push({ need:"🏠 Temporary Shelter",          priority:"HIGH",     reason:"Buildings may be unsafe to re-enter" });
+    needs.push(          { need:"🧹 Debris Removal Equipment",    priority:"HIGH",     reason:"Rubble blocks access to survivors and exits" });
+    if(floors>2) needs.push({ need:"🏗️ Structural Engineers",    priority:"HIGH",     reason:`${name} has ${floors} floors — safety check required` });
+  }
+  if(disaster==="Fire") {
+    needs.push({ need:"🚒 Fire Brigade & Foam",                   priority:"CRITICAL", reason:"Active fire suppression required immediately" });
+    needs.push({ need:"😷 Smoke Inhalation Treatment",            priority:"HIGH",     reason:"Smoke causes respiratory injuries" });
+    needs.push({ need:"⚡ Electrical Safety Inspection",          priority:"MEDIUM",   reason:"Fire often causes electrical faults" });
+    if(dmg>50) needs.push({ need:"🏠 Temporary Shelter",         priority:"HIGH",     reason:"Building uninhabitable after fire" });
+  }
+  if(disaster==="Flood") {
+    needs.push({ need:"🚣 Boats & Rescue Floats",                 priority:"CRITICAL", reason:"Water may trap people in upper floors" });
+    needs.push({ need:"🚰 Clean Water Supply",                    priority:"CRITICAL", reason:"Floodwater contaminates drinking water" });
+    needs.push({ need:"💊 Anti-infection Medicines",              priority:"HIGH",     reason:"Floodwater carries bacteria and disease" });
+    needs.push({ need:"🔌 Power Restoration",                     priority:"MEDIUM",   reason:"Flood causes electrical short circuits" });
+  }
+  if(disaster==="Cyclone") {
+    needs.push({ need:"🏠 Emergency Shelter",                     priority:"CRITICAL", reason:"Roofs and windows likely damaged" });
+    needs.push({ need:"⚡ Power Line Restoration",                priority:"HIGH",     reason:"Cyclones destroy electrical infrastructure" });
+    needs.push({ need:"🌳 Fallen Tree Removal",                   priority:"HIGH",     reason:"Blocked roads prevent rescue access" });
+    needs.push({ need:"📡 Communication Restoration",             priority:"MEDIUM",   reason:"Restore emergency communication systems" });
+  }
+  if(dmg>60) needs.push({ need:"🩺 Mobile Medical Unit",         priority:"HIGH",     reason:"Hospital access may be blocked" });
+  needs.push(            { need:"📢 Public Announcement System",  priority:"MEDIUM",   reason:"Keep people informed of safe zones" });
+  return needs;
+}
+
+const priorityColor = (p) => p==="CRITICAL"?c.red:p==="HIGH"?c.gold:c.blue;
+const riskColor     = (r) => r==="CRITICAL"?c.red:r==="HIGH"?c.gold:r==="MODERATE"?c.blue:c.green;
 
 export default function DamagePrediction() {
   const navigate = useNavigate();
+  const user     = getUser();
+  const isAdmin  = user?.role==="admin";
   const [disaster,  setDisaster]  = useState("Earthquake");
-  const [magnitude, setMagnitude] = useState(5);
-  const [idx,       setIdx]       = useState(0);
-  const [floors,    setFloors]    = useState(BUILDINGS[0].floors);
-  const [age,       setAge]       = useState(BUILDINGS[0].age);
-  const [material,  setMaterial]  = useState(BUILDINGS[0].material);
-  const [occupants, setOccupants] = useState(200);
+  const [magnitude, setMagnitude] = useState(6.5);
+  const [building,  setBuilding]  = useState(BUILDINGS[0]);
   const [result,    setResult]    = useState(null);
+  const [loading,   setLoading]   = useState(false);
 
-  const selectBuilding = (i) => {
-    setIdx(i);
-    setFloors(BUILDINGS[i].floors);
-    setAge(BUILDINGS[i].age);
-    setMaterial(BUILDINGS[i].material);
-    setResult(null);
-  };
+  const pct      = Math.min(100,(magnitude/10)*100);
+  const magLabel = (x)=>x<4?"MINOR":x<6?"MODERATE":x<7.5?"MAJOR":"SEVERE";
 
   const run = () => {
-    setResult(calcRisk({ disaster, magnitude, buildingName: BUILDINGS[idx].name, floors, age, material, occupants }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setLoading(true); setResult(null);
+    setTimeout(()=>{
+      const dmg   = calcDamage(disaster,magnitude,building.floors);
+      const needs = predictNeeds(disaster,magnitude,building.name,building.floors,dmg);
+      const risk  = dmg<30?"LOW":dmg<60?"MODERATE":dmg<80?"HIGH":"CRITICAL";
+      setResult({dmg,needs,risk});
+      setLoading(false);
+    },1800);
   };
 
-  const inp = { width: "100%", background: c.pill, border: `1px solid ${c.border}`, borderRadius: 12, padding: "12px", color: "#fff", fontSize: 14, outline: "none", boxSizing: "border-box" };
-  const lbl = { display: "block", fontSize: 10, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 };
-
   return (
-    <div style={{ minHeight: "100vh", background: c.bg, color: "#fff", padding: 18, fontFamily: "system-ui", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div style={{minHeight:"100vh",background:c.bg,color:"#fff",fontFamily:"system-ui",display:"flex",justifyContent:"center",padding:18}}>
+    <div style={{width:"100%",maxWidth:420,paddingBottom:80}}>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <button type="button" onClick={() => navigate("/dashboard")}
-            style={{ background: c.pill, border: `1px solid ${c.border}`, borderRadius: 12, width: 44, height: 44, display: "grid", placeItems: "center", cursor: "pointer", color: "#fff" }}>
-            <ChevronLeft />
-          </button>
-          <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 16, fontWeight: 900, margin: 0 }}>Risk Assessment</p>
-            <p style={{ fontSize: 11, color: c.muted, margin: 0 }}>AISSMS Campus Analysis</p>
-          </div>
-          <div style={{ width: 44, height: 44, background: c.pill, border: `1px solid ${c.border}`, borderRadius: 12, display: "grid", placeItems: "center", color: c.red }}>
-            <Zap size={18} />
-          </div>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <button onClick={()=>navigate(isAdmin?"/admin":"/dashboard")} style={{background:c.pill,border:`1px solid ${c.border}`,borderRadius:12,width:44,height:44,display:"grid",placeItems:"center",cursor:"pointer",color:"#fff"}}><ChevronLeft/></button>
+        <div style={{textAlign:"center"}}>
+          <p style={{fontSize:16,fontWeight:900,margin:0}}>Risk Assessment</p>
+          <p style={{fontSize:11,color:c.muted,margin:0}}>AI Damage & Needs Predictor</p>
         </div>
-
-        {/* Result */}
-        {result && (
-          <div style={{ background: result.bg, border: `2px solid ${result.color}`, borderRadius: 18, padding: 20, marginBottom: 16, textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: c.muted, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Assessment Result</div>
-            <div style={{ fontSize: 54, fontWeight: 900, color: result.color, lineHeight: 1 }}>{result.score}%</div>
-            <div style={{ marginTop: 8, display: "inline-block", background: `${result.color}22`, border: `1px solid ${result.color}55`, borderRadius: 999, padding: "6px 20px", fontWeight: 900, fontSize: 14, color: result.color }}>
-              {result.level}
-            </div>
-            <p style={{ marginTop: 10, fontWeight: 800, fontSize: 13 }}>{BUILDINGS[idx].emoji} {BUILDINGS[idx].name}</p>
-            <p style={{ fontSize: 11, color: c.muted }}>
-              {disaster} | Magnitude: {magnitude}/10 | Age: {age} yrs | Floors: {floors} | Occupants: {occupants}
-            </p>
-            <div style={{ marginTop: 10, background: `${result.color}18`, borderRadius: 12, padding: 12 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: result.color }}>{result.action}</p>
-            </div>
-            <button onClick={() => setResult(null)}
-              style={{ marginTop: 12, background: c.pill, border: `1px solid ${c.border}`, color: "#fff", padding: "10px 24px", borderRadius: 12, cursor: "pointer", fontWeight: 800 }}>
-              New Assessment
-            </button>
-          </div>
-        )}
-
-        {/* Form */}
-        <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 18, padding: 20 }}>
-
-          {/* Disaster Type */}
-          <label style={lbl}>Disaster Type</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            {DISASTERS.map(({ key, icon, color }) => (
-              <button key={key} type="button" onClick={() => setDisaster(key)}
-                style={{ background: c.pill, border: `2px solid ${disaster === key ? color : c.border}`, borderRadius: 14, padding: 16, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, boxShadow: disaster === key ? `0 0 16px ${color}44` : "none" }}>
-                <div style={{ color: disaster === key ? color : "#888" }}>{icon}</div>
-                <span style={{ fontSize: 13, fontWeight: 900, color: disaster === key ? color : "#fff" }}>{key}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Campus Location */}
-          <label style={lbl}>Select Campus Location</label>
-          <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-            {BUILDINGS.map((b, i) => (
-              <button key={b.name} type="button" onClick={() => selectBuilding(i)}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, border: `2px solid ${idx === i ? c.red : c.border}`, background: idx === i ? `${c.red}15` : c.pill, cursor: "pointer", textAlign: "left" }}>
-                <span style={{ fontSize: 22 }}>{b.emoji}</span>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: idx === i ? c.red : "#fff" }}>{b.name}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 10, color: c.muted }}>Auto-filled: {b.floors} floors · {b.age} yrs · {b.material}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Magnitude */}
-          <label style={lbl}>
-            Severity / Magnitude — <span style={{ color: c.red }}>{magnitude}/10</span>{" "}
-            <span style={{ color: c.muted }}>({magnitude < 4 ? "MINOR" : magnitude < 6 ? "MODERATE" : magnitude < 8 ? "MAJOR" : "SEVERE"})</span>
-          </label>
-          <input type="range" min={1} max={10} value={magnitude}
-            onChange={(e) => setMagnitude(Number(e.target.value))}
-            style={{ width: "100%", accentColor: c.red, marginBottom: 4 }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: c.muted, marginBottom: 20 }}>
-            <span>MINOR</span><span>MODERATE</span><span>MAJOR</span><span>SEVERE</span>
-          </div>
-
-          {/* Number of Floors */}
-          <label style={lbl}>Number of Floors</label>
-          <input type="number" min={1} max={20} value={floors}
-            onChange={(e) => setFloors(Number(e.target.value))}
-            style={{ ...inp, marginBottom: 16 }} />
-
-          {/* Building Age - RESTORED ✅ */}
-          <label style={lbl}>Building Age (years)</label>
-          <input type="number" min={1} max={100} value={age}
-            onChange={(e) => setAge(Number(e.target.value))}
-            style={{ ...inp, marginBottom: 16 }} />
-
-          {/* Construction Material */}
-          <label style={lbl}>Construction Material</label>
-          <select value={material} onChange={(e) => setMaterial(e.target.value)}
-            style={{ ...inp, marginBottom: 16, appearance: "none" }}>
-            {["RCC", "Steel Frame", "Old Brick", "Open"].map((m) => (
-              <option key={m} value={m} style={{ background: c.bg }}>{m}</option>
-            ))}
-          </select>
-
-          {/* Estimated Occupants */}
-          <label style={lbl}>Estimated Occupants</label>
-          <input type="number" min={0} max={3000} value={occupants}
-            onChange={(e) => setOccupants(Number(e.target.value))}
-            style={{ ...inp, marginBottom: 20 }} />
-
-          {/* Submit */}
-          <button type="button" onClick={run}
-            style={{ width: "100%", background: c.red, border: "none", borderRadius: 14, padding: 16, fontWeight: 900, fontSize: 15, cursor: "pointer", color: "#fff", boxShadow: `0 8px 20px ${c.red}44`, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <CheckCircle size={18} /> RUN RISK ASSESSMENT
-          </button>
-        </div>
-        <div style={{ height: 24 }} />
+        <div style={{background:c.pill,border:`1px solid ${c.border}`,borderRadius:12,width:44,height:44,display:"grid",placeItems:"center"}}><Zap size={18} color={c.red}/></div>
       </div>
-    </div>
+
+      {/* Card */}
+      <div style={{background:c.card,border:`1px solid ${c.border}`,borderRadius:18,padding:16,marginBottom:14}}>
+
+        {/* Disaster */}
+        <p style={{fontSize:10,fontWeight:700,color:c.muted,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 10px"}}>Disaster Type</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+          {TYPES.map(t=>(
+            <button key={t.key} onClick={()=>{setDisaster(t.key);setResult(null);}}
+              style={{background:c.pill,border:`2px solid ${disaster===t.key?c.red:c.border}`,borderRadius:14,padding:14,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:8,boxShadow:disaster===t.key?`0 0 16px ${c.red}44`:"none"}}>
+              <div style={{color:disaster===t.key?c.red:"#d8d8df"}}>{t.icon}</div>
+              <span style={{fontSize:12,fontWeight:900,color:disaster===t.key?c.red:"#fff"}}>{t.key}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Magnitude */}
+        <p style={{fontSize:10,fontWeight:700,color:c.muted,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>Severity / Magnitude</p>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+          <span style={{fontSize:10,color:c.muted,fontWeight:800}}>{magLabel(magnitude)}</span>
+          <span style={{fontSize:20,fontWeight:900,color:c.red}}>{magnitude.toFixed(1)} <span style={{fontSize:10,color:c.muted}}>/ 10</span></span>
+        </div>
+        <div style={{height:6,borderRadius:999,background:"#2a2a35",position:"relative",marginBottom:10}}>
+          <div style={{position:"absolute",left:0,top:0,bottom:0,width:`${pct}%`,borderRadius:999,background:c.red}}/>
+        </div>
+        <input type="range" min="0" max="10" step="0.1" value={magnitude}
+          onChange={e=>{setMagnitude(parseFloat(e.target.value));setResult(null);}}
+          style={{width:"100%",accentColor:c.red,marginBottom:6}}/>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:c.muted,fontWeight:800,marginBottom:18}}>
+          <span>MINOR</span><span>MODERATE</span><span>MAJOR</span><span>SEVERE</span>
+        </div>
+
+        {/* Buildings */}
+        <p style={{fontSize:10,fontWeight:700,color:c.muted,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 10px"}}>AISSMS Campus Building</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:18}}>
+          {BUILDINGS.map(b=>(
+            <button key={b.name} onClick={()=>{setBuilding(b);setResult(null);}}
+              style={{background:building.name===b.name?`${c.red}15`:c.pill,border:`2px solid ${building.name===b.name?c.red:c.border}`,borderRadius:12,padding:"10px 8px",cursor:"pointer",textAlign:"left"}}>
+              <div style={{fontSize:18,marginBottom:4}}>{b.emoji}</div>
+              <div style={{fontSize:10,fontWeight:800,color:building.name===b.name?c.red:"#fff",lineHeight:1.3}}>{b.name}</div>
+              <div style={{fontSize:9,color:c.muted,marginTop:2}}>{b.floors} floor{b.floors>1?"s":""}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Run */}
+        <button onClick={run} disabled={loading}
+          style={{width:"100%",background:c.red,border:"none",borderRadius:14,padding:16,color:"#fff",fontWeight:900,fontSize:15,cursor:loading?"not-allowed":"pointer",opacity:loading?0.8:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10,boxShadow:`0 12px 30px ${c.red}44`}}>
+          <Brain size={18}/> {loading?"AI Analyzing...":"RUN AI PREDICTION"}
+        </button>
+      </div>
+
+      {/* Loading */}
+      {loading && (
+        <div style={{background:c.card,border:`1px solid ${c.border}`,borderRadius:18,padding:24,textAlign:"center",marginBottom:14}}>
+          <div style={{fontSize:36,marginBottom:10}}>🤖</div>
+          <p style={{fontWeight:800,fontSize:14,margin:"0 0 6px"}}>AI Analyzing...</p>
+          <p style={{fontSize:11,color:c.muted,margin:0}}>Calculating damage risk and post-disaster needs for {building.name}</p>
+        </div>
+      )}
+
+      {/* Results */}
+      {result && (<>
+        {/* Risk Score */}
+        <div style={{background:c.card,border:`2px solid ${riskColor(result.risk)}`,borderRadius:18,padding:18,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div>
+              <p style={{margin:0,fontSize:11,color:c.muted,fontWeight:700,textTransform:"uppercase"}}>Damage Risk Score</p>
+              <p style={{margin:"4px 0 0",fontSize:13,fontWeight:800}}>{building.name}</p>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:36,fontWeight:900,color:riskColor(result.risk)}}>{result.dmg}%</div>
+              <span style={{background:riskColor(result.risk),padding:"3px 10px",borderRadius:999,fontSize:10,fontWeight:900}}>{result.risk} RISK</span>
+            </div>
+          </div>
+          <div style={{height:10,borderRadius:999,background:"#2a2a35"}}>
+            <div style={{height:"100%",width:`${result.dmg}%`,borderRadius:999,background:riskColor(result.risk)}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:9,color:c.muted,fontWeight:800}}>
+            <span>LOW</span><span>MODERATE</span><span>HIGH</span><span>CRITICAL</span>
+          </div>
+        </div>
+
+        {/* AI Needs */}
+        <div style={{background:c.card,border:`1px solid ${c.border}`,borderRadius:18,padding:18,marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <Brain size={16} color={c.blue}/>
+            <div>
+              <p style={{margin:0,fontWeight:900,fontSize:14}}>AI Post-Disaster Needs</p>
+              <p style={{margin:"2px 0 0",fontSize:10,color:c.muted}}>Resources needed after {disaster} at {building.name}</p>
+            </div>
+          </div>
+          {result.needs.map((n,i)=>(
+            <div key={i} style={{background:c.pill,border:`1px solid ${priorityColor(n.priority)}33`,borderRadius:14,padding:12,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                <span style={{fontWeight:800,fontSize:13}}>{n.need}</span>
+                <span style={{background:priorityColor(n.priority),padding:"2px 8px",borderRadius:999,fontSize:9,fontWeight:900,flexShrink:0}}>{n.priority}</span>
+              </div>
+              <p style={{margin:0,fontSize:10,color:c.muted}}>{n.reason}</p>
+            </div>
+          ))}
+          <div style={{background:"#001a0d",border:`1px solid ${c.green}44`,borderRadius:12,padding:12,display:"flex",gap:8}}>
+            <CheckCircle size={15} color={c.green} style={{flexShrink:0,marginTop:1}}/>
+            <p style={{margin:0,fontSize:10,color:"#80c898",lineHeight:1.5}}>
+              <strong style={{color:c.green}}>AI Complete</strong> — Share with campus authorities and NDRF for coordinated response.
+            </p>
+          </div>
+        </div>
+      </>)}
+
+    </div></div>
   );
 }
