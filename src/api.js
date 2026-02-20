@@ -13,25 +13,21 @@ export const clearAuth = () => {
   localStorage.removeItem("safera_offline_pw");
 };
 
-// ── Save credentials for offline login ──────────────────────
-// We store a hashed version (btoa) — not plaintext, not cryptographic
-// Just enough to verify "same user" without sending to server
+// Save credentials for offline login
 export const saveOfflineCreds = (email, password) => {
   localStorage.setItem("safera_offline_email", email.toLowerCase().trim());
-  localStorage.setItem("safera_offline_pw",    btoa(email.toLowerCase().trim() + ":" + password));
+  localStorage.setItem("safera_offline_pw", btoa(email.toLowerCase().trim() + "::" + password));
 };
 
+// Verify offline credentials match saved ones
 export const checkOfflineCreds = (email, password) => {
-  const storedEmail = localStorage.getItem("safera_offline_email");
-  const storedPw    = localStorage.getItem("safera_offline_pw");
-  if (!storedEmail || !storedPw) return false;
-  const match = btoa(email.toLowerCase().trim() + ":" + password);
-  return storedEmail === email.toLowerCase().trim() && storedPw === match;
+  const savedEmail = localStorage.getItem("safera_offline_email");
+  const savedPw    = localStorage.getItem("safera_offline_pw");
+  if (!savedEmail || !savedPw) return false;
+  const check = btoa(email.toLowerCase().trim() + "::" + password);
+  return savedEmail === email.toLowerCase().trim() && savedPw === check;
 };
 
-export const hasOfflineCreds = () => !!localStorage.getItem("safera_offline_email");
-
-// ── Generic request with offline awareness ───────────────────
 const request = async (path, options = {}) => {
   const token = getToken();
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -47,14 +43,12 @@ const request = async (path, options = {}) => {
   return data;
 };
 
-// ── Auth ─────────────────────────────────────────────────────
 export const authAPI = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login:    (body) => request("/auth/login",    { method: "POST", body: JSON.stringify(body) }),
   me:       ()     => request("/auth/me"),
 };
 
-// ── User ─────────────────────────────────────────────────────
 export const userAPI = {
   getProfile:     ()         => request("/user/profile"),
   updateProfile:  (body)     => request("/user/profile",         { method: "PUT",    body: JSON.stringify(body) }),
@@ -64,15 +58,13 @@ export const userAPI = {
   updateUserRole: (id, role) => request(`/user/${id}/role`,      { method: "PUT",    body: JSON.stringify({ role }) }),
 };
 
-// ── SOS ──────────────────────────────────────────────────────
 export const sosAPI = {
-  send:         (body)         => request("/sos",               { method: "POST", body: JSON.stringify(body) }),
-  myAlerts:     ()             => request("/sos/my"),
-  allAlerts:    ()             => request("/sos/all"),
-  updateStatus: (id, status)   => request(`/sos/${id}/status`,  { method: "PUT",  body: JSON.stringify({ status }) }),
+  send:         (body)       => request("/sos",              { method: "POST", body: JSON.stringify(body) }),
+  myAlerts:     ()           => request("/sos/my"),
+  allAlerts:    ()           => request("/sos/all"),
+  updateStatus: (id, status) => request(`/sos/${id}/status`, { method: "PUT",  body: JSON.stringify({ status }) }),
 };
 
-// ── Contacts ─────────────────────────────────────────────────
 export const contactsAPI = {
   getAll:  ()         => request("/contacts"),
   create:  (body)     => request("/contacts",       { method: "POST",   body: JSON.stringify(body) }),
@@ -80,17 +72,15 @@ export const contactsAPI = {
   remove:  (id)       => request(`/contacts/${id}`, { method: "DELETE" }),
 };
 
-// ── Broadcast ────────────────────────────────────────────────
 export const broadcastAPI = {
   send:   (body) => request("/broadcast",       { method: "POST",   body: JSON.stringify(body) }),
   getAll: ()     => request("/broadcast"),
   delete: (id)   => request(`/broadcast/${id}`, { method: "DELETE" }),
 };
 
-// ── Damage Reports ───────────────────────────────────────────
 export const damageAPI = {
-  submit:       (body)              => request("/damage",             { method: "POST", body: JSON.stringify(body) }),
+  submit:       (body)              => request("/damage",               { method: "POST", body: JSON.stringify(body) }),
   myReports:    ()                  => request("/damage/my"),
   allReports:   ()                  => request("/damage/all"),
-  updateStatus: (id, status, notes) => request(`/damage/${id}/status`,{ method: "PUT",  body: JSON.stringify({ status, adminNotes: notes }) }),
+  updateStatus: (id, status, notes) => request(`/damage/${id}/status`,  { method: "PUT",  body: JSON.stringify({ status, adminNotes: notes }) }),
 };

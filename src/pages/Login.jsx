@@ -12,21 +12,12 @@ export default function CampusDisasterLogin() {
   const [showPw, setShowPw]     = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [offline, setOffline]   = useState(false);
   const navigate = useNavigate();
 
   const c = { bg: "#0f0f13", card: "#1a1a24", input: "#121218", red: "#ff3b30", border: "#2d2d38", muted: "#8e8e93", gold: "#FF9F0A" };
 
-  // Track online/offline
-  useEffect(() => {
-    const on  = () => setIsOffline(false);
-    const off = () => setIsOffline(true);
-    window.addEventListener("online",  on);
-    window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
-
-  // Auto-login if already has valid session saved
+  // Auto-redirect if already logged in (token + user exist in localStorage)
   useEffect(() => {
     const token = getToken();
     const user  = getUser();
@@ -37,52 +28,49 @@ export default function CampusDisasterLogin() {
 
   const handleSubmit = async () => {
     setError("");
+    setOffline(false);
     if (!email || !password) return setError("Email and password are required.");
     if (mode === "register" && !name) return setError("Full name is required.");
-
     setLoading(true);
 
-    // ── OFFLINE LOGIN ────────────────────────────────────────
-    if (!navigator.onLine) {
-      if (mode === "register") {
-        setError("Cannot register while offline. Please connect to internet first.");
-        setLoading(false);
-        return;
-      }
-
-      // Check saved credentials
-      if (checkOfflineCreds(email, password)) {
-        const user = getUser(); // already saved from last online session
-        if (user) {
-          // Reuse existing token + user — navigate directly
-          navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-        } else {
-          setError("Offline login failed. Please connect to internet once to set up offline access.");
-        }
-      } else {
-        setError("Incorrect credentials. You must login online at least once before using offline mode.");
-      }
-      setLoading(false);
-      return;
-    }
-
-    // ── ONLINE LOGIN / REGISTER ──────────────────────────────
     try {
+      // ── Try online first ──────────────────────────────────
       const data = mode === "login"
         ? await authAPI.login({ email, password })
         : await authAPI.register({ name, email, password, role });
 
-      // Save auth
+      // Online success — save everything including offline creds
       saveAuth(data.token, data.user);
-
-      // Save credentials for future offline login
-      if (mode === "login") {
-        saveOfflineCreds(email, password);
-      }
-
+      if (mode === "login") saveOfflineCreds(email, password);
       navigate(data.user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+
     } catch (err) {
-      setError(err.message);
+      // ── Check if error is network/offline ─────────────────
+      // TypeError = fetch failed = no internet
+      const isNetworkError = err instanceof TypeError
+        || err.message === "Failed to fetch"
+        || err.message?.toLowerCase().includes("network")
+        || err.message?.toLowerCase().includes("fetch");
+
+      if (isNetworkError && mode === "login") {
+        // ── Try offline login ─────────────────────────────
+        setOffline(true);
+        if (checkOfflineCreds(email, password)) {
+          const savedUser = getUser();
+          if (savedUser) {
+            // Use existing saved session — navigate directly
+            navigate(savedUser.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+            return;
+          }
+        }
+        setError("Offline: wrong email/password, OR you have never logged in online before on this device.");
+      } else if (isNetworkError && mode === "register") {
+        setOffline(true);
+        setError("Cannot register while offline. Connect to internet first.");
+      } else {
+        // Real server error (wrong password etc.)
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -95,14 +83,15 @@ export default function CampusDisasterLogin() {
     <div style={{ minHeight: "100vh", background: c.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "system-ui", color: "#fff" }}>
       <div style={{ width: "100%", maxWidth: 400, background: c.card, borderRadius: 24, padding: 32, border: `1px solid ${c.border}`, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" }}>
 
-        {/* Offline banner */}
-        {isOffline && (
-          <div style={{ background: "#1a1300", border: `1px solid ${c.gold}55`, borderRadius: 14, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-            <WifiOff size={18} color={c.gold} style={{ flexShrink: 0 }} />
+        {/* Offline notice */}
+        {offline && (
+          <div style={{ background: "#1a1300", border: `1px solid ${c.gold}55`, borderRadius: 14, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <WifiOff size={18} color={c.gold} style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
-              <p style={{ margin: 0, fontWeight: 800, fontSize: 12, color: c.gold }}>You are offline</p>
-              <p style={{ margin: "3px 0 0", fontSize: 10, color: "#a08030" }}>
-                Login with your saved credentials to access Alerts &amp; Emergency Contacts
+              <p style={{ margin: 0, fontWeight: 800, fontSize: 12, color: c.gold }}>📵 No Internet — Offline Mode</p>
+              <p style={{ margin: "4px 0 0", fontSize: 11, color: "#a08030", lineHeight: 1.5 }}>
+                Use the same email &amp; password you used online before.<br />
+                Alerts &amp; Emergency Contacts work from cache.
               </p>
             </div>
           </div>
@@ -120,8 +109,8 @@ export default function CampusDisasterLogin() {
         {/* Tabs */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
           {["login", "register"].map((m) => (
-            <button key={m} type="button" onClick={() => { setMode(m); setError(""); }}
-              style={{ padding: 10, borderRadius: 12, border: `2px solid ${mode === m ? c.red : c.border}`, background: mode === m ? `${c.red}15` : c.input, color: mode === m ? c.red : c.muted, fontWeight: 800, fontSize: 12, cursor: "pointer", textTransform: "uppercase", opacity: m === "register" && isOffline ? 0.4 : 1 }}>
+            <button key={m} type="button" onClick={() => { setMode(m); setError(""); setOffline(false); }}
+              style={{ padding: 10, borderRadius: 12, border: `2px solid ${mode === m ? c.red : c.border}`, background: mode === m ? `${c.red}15` : c.input, color: mode === m ? c.red : c.muted, fontWeight: 800, fontSize: 12, cursor: "pointer", textTransform: "uppercase" }}>
               {m === "login" ? "Sign In" : "Register"}
             </button>
           ))}
@@ -129,12 +118,12 @@ export default function CampusDisasterLogin() {
 
         {/* Error */}
         {error && (
-          <div style={{ background: "#ff3b3018", border: "1px solid #ff3b3055", borderRadius: 12, padding: 12, fontSize: 12, color: "#ff6b63", marginBottom: 16, textAlign: "center" }}>
+          <div style={{ background: "#ff3b3018", border: "1px solid #ff3b3055", borderRadius: 12, padding: 12, fontSize: 12, color: "#ff6b63", marginBottom: 16 }}>
             ⚠️ {error}
           </div>
         )}
 
-        {/* Name (register only) */}
+        {/* Name */}
         {mode === "register" && (
           <div style={{ position: "relative", marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Full Name</label>
@@ -161,13 +150,13 @@ export default function CampusDisasterLogin() {
           </button>
         </div>
 
-        {/* Role (register only) */}
+        {/* Role */}
         {mode === "register" && (
           <>
             <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: c.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Select Role</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
               {[
-                { val: "admin", icon: <Shield size={24} color={role === "admin" ? c.red : "#555"} />, label: "Admin", sub: "FULL ACCESS" },
+                { val: "admin", icon: <Shield size={24} color={role === "admin" ? c.red : "#555"} />, label: "Admin",  sub: "FULL ACCESS"    },
                 { val: "user",  icon: <div style={{ background: role === "user" ? c.red : "#333", padding: 4, borderRadius: "50%" }}><User size={18} color="white" /></div>, label: "User", sub: "VIEW & RESPOND" },
               ].map(({ val, icon, label, sub }) => (
                 <button key={val} type="button" onClick={() => setRole(val)}
@@ -184,29 +173,19 @@ export default function CampusDisasterLogin() {
         {/* Submit */}
         <button type="button" onClick={handleSubmit} disabled={loading}
           style={{ width: "100%", background: c.red, border: "none", borderRadius: 16, color: "#fff", padding: 16, fontWeight: 900, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: loading ? "not-allowed" : "pointer", marginBottom: 16, boxShadow: `0 8px 20px ${c.red}44`, opacity: loading ? 0.7 : 1 }}>
-          {loading ? "Please wait…" : isOffline ? "Login Offline" : mode === "login" ? "Access Command Center" : "Create Account"}
+          {loading ? "Please wait…" : mode === "login" ? "Access Command Center" : "Create Account"}
           {!loading && <ChevronRight size={18} />}
         </button>
 
-        {/* Offline tip */}
-        {isOffline ? (
-          <div style={{ display: "flex", gap: 10, padding: 12, background: "#0a0a10", borderRadius: 12, border: `1px solid ${c.border}`, marginBottom: 20 }}>
-            <WifiOff size={18} color={c.gold} style={{ flexShrink: 0, marginTop: 1 }} />
-            <p style={{ fontSize: 10, color: "#a08030", margin: 0, lineHeight: 1.5 }}>
-              <strong style={{ color: c.gold }}>Offline Mode:</strong> Use the same email &amp; password you used online before. Alerts and Emergency Contacts will be available from cache.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 12, padding: 12, background: c.input, borderRadius: 12, border: `1px solid ${c.border}`, marginBottom: 20 }}>
-            <Info size={20} color={c.muted} style={{ flexShrink: 0 }} />
-            <p style={{ fontSize: 10, color: c.muted, margin: 0, lineHeight: 1.4 }}>
-              <strong style={{ color: "#ccc" }}>Tip:</strong>{" "}
-              {mode === "login" ? "Sign in with your registered campus credentials." : "Register first, then sign in to access the system."}
-            </p>
-          </div>
-        )}
+        {/* Tip */}
+        <div style={{ display: "flex", gap: 12, padding: 12, background: c.input, borderRadius: 12, border: `1px solid ${c.border}`, marginBottom: 20 }}>
+          <Info size={20} color={c.muted} style={{ flexShrink: 0 }} />
+          <p style={{ fontSize: 10, color: c.muted, margin: 0, lineHeight: 1.4 }}>
+            <strong style={{ color: "#ccc" }}>Offline Tip:</strong> Login once with internet → next time offline login works automatically with same email & password.
+          </p>
+        </div>
 
-        {/* Emergency */}
+        {/* Emergency Call */}
         <button type="button" onClick={() => { const a = document.createElement("a"); a.href = "tel:112"; a.click(); }}
           style={{ width: "100%", background: c.red, border: "none", borderRadius: 16, color: "#fff", padding: 16, fontWeight: 900, fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", boxShadow: `0 8px 20px ${c.red}44` }}>
           <Phone size={22} fill="white" /> EMERGENCY CALL HELP
