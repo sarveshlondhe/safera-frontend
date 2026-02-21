@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { getToken, getUser } from "./api.js";
-
+import NDMAAlerts from "./pages/NDMAAlerts";
 import Login             from "./pages/Login";
 import Dashboard         from "./pages/Dashboard";
 import Alerts            from "./pages/Alerts";
@@ -35,6 +35,7 @@ export default function App() {
         <Route path="/admin"     element={<Protected adminOnly><AdminDashboard /></Protected>} />
         <Route path="/ngo"       element={<Protected><NGOContacts /></Protected>} />
         <Route path="*"          element={<Navigate to="/" replace />} />
+        <Route path="/ndma" element={<Protected><NDMAAlerts /></Protected>} />
       </Routes>
     </BrowserRouter>
   );
