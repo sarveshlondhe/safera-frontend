@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Megaphone, Building2, PhoneCall, Users, Siren, LogOut, CheckCircle, RefreshCw, X, Send } from "lucide-react";
+import { Zap, Megaphone, Building2, PhoneCall, Users, Siren, LogOut, CheckCircle, RefreshCw, X, Send, Globe } from "lucide-react";
 import { userAPI, sosAPI, broadcastAPI, clearAuth, getUser } from "../api.js";
 
 const c = { bg: "#0f0f13", card: "#1a1a24", border: "#2d2d38", muted: "#8e8e93", red: "#ff3b30", pill: "#121218" };
@@ -209,6 +209,7 @@ export default function AdminDashboard() {
                 { icon: <Megaphone size={18} />, title: "Broadcast Alerts",  desc: `${broadcasts.length} sent alerts`,     action: () => setTab("broadcasts") },
                 { icon: <PhoneCall size={18} />, title: "Emergency Contacts",desc: "View & update contacts",               action: () => navigate("/contacts") },
                 { icon: <Building2 size={18} />, title: "Risk Assessment",   desc: "AISSMS building analysis",             action: () => navigate("/damage") },
+                { icon: <Globe size={18} color="#30D158" />, title: "🌍 Natural Disaster AI", desc: "Live USGS · NDMA · IMD monitoring",   action: () => navigate("/natural-disaster") },
               ].map(({ icon, title, desc, action }) => (
                 <div key={title} onClick={action}
                   style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, background: c.pill, border: `1px solid ${c.border}`, marginBottom: 10, cursor: "pointer" }}>
