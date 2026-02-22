@@ -14,6 +14,7 @@ import SOSPage           from "./pages/SOSPage";
 import Profile           from "./pages/Profile";
 import NGOContacts       from "./pages/NGOContacts";
 import NDMAAlerts        from "./pages/NDMAAlerts";
+import NaturalDisasterDashboard from "./pages/NaturalDisasterDashboard";
 import FireAssessment from "./pages/FireAssessment";
 const LEVEL_COLOR = { CRITICAL:"#FF3B30", WARNING:"#FF9F0A", INFO:"#0A84FF" };
 const LEVEL_BG    = { CRITICAL:"#2a0000", WARNING:"#2a1800", INFO:"#001020" };
@@ -114,6 +115,7 @@ function InnerApp() {
         <Route path="*"          element={<Navigate to="/" replace />} />
         <Route path="/evacuation" element={<Protected><EvacuationStatus /></Protected>} />
         <Route path="/fire" element={<Protected><FireAssessment /></Protected>} />
+        <Route path="/natural-disaster" element={<Protected><NaturalDisasterDashboard /></Protected>} />
       </Routes>
     </>
   );
