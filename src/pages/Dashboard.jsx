@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Home, Bell, Map, ShieldAlert, User, ChevronRight, Zap, Phone, Globe } from "lucide-react";
+import { Home, Bell, Map, ShieldAlert, User, ChevronRight, Zap, Phone, Flame, Globe } from "lucide-react";
 import { getUser } from "../api.js";
 
 export default function Dashboard() {
@@ -82,6 +82,17 @@ export default function Dashboard() {
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 14 }}>Safe Routes & Map</div>
               <div style={{ fontSize: 11, color: c.muted }}>AISSMS campus evacuation paths</div>
+            </div>
+            <ChevronRight color={c.muted} />
+          </div>
+
+          <div style={item} onClick={() => navigate("/fire")}>
+            <div style={{ width: 36, height: 36, borderRadius: 12, background: "#1a0800", display: "grid", placeItems: "center" }}>
+              <Flame size={18} color="#FF6B35" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>🔥 Fire Assessment</div>
+              <div style={{ fontSize: 11, color: c.muted }}>Automated damage & needs engine</div>
             </div>
             <ChevronRight color={c.muted} />
           </div>
