@@ -14,7 +14,7 @@ import SOSPage           from "./pages/SOSPage";
 import Profile           from "./pages/Profile";
 import NGOContacts       from "./pages/NGOContacts";
 import NDMAAlerts        from "./pages/NDMAAlerts";
-
+import FireAssessment from "./pages/FireAssessment";
 const LEVEL_COLOR = { CRITICAL:"#FF3B30", WARNING:"#FF9F0A", INFO:"#0A84FF" };
 const LEVEL_BG    = { CRITICAL:"#2a0000", WARNING:"#2a1800", INFO:"#001020" };
 const TYPE_EMOJI  = { Fire:"🔥",Flood:"🌊",Earthquake:"🏚️",Cyclone:"🌀",Security:"🚨",General:"⚠️",SOS:"🆘" };
@@ -113,6 +113,7 @@ function InnerApp() {
         <Route path="/ndma"      element={<Protected><NDMAAlerts /></Protected>} />
         <Route path="*"          element={<Navigate to="/" replace />} />
         <Route path="/evacuation" element={<Protected><EvacuationStatus /></Protected>} />
+        <Route path="/fire" element={<Protected><FireAssessment /></Protected>} />
       </Routes>
     </>
   );
