@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { getToken, getUser } from "./api.js";
 import usePushNotifications from "./usePushNotifications.js";
-
+import EvacuationStatus from "./pages/EvacuationStatus";
 import Login             from "./pages/Login";
 import Dashboard         from "./pages/Dashboard";
 import Alerts            from "./pages/Alerts";
@@ -112,6 +112,7 @@ function InnerApp() {
         <Route path="/ngo"       element={<Protected><NGOContacts /></Protected>} />
         <Route path="/ndma"      element={<Protected><NDMAAlerts /></Protected>} />
         <Route path="*"          element={<Navigate to="/" replace />} />
+        <Route path="/evacuation" element={<Protected><EvacuationStatus /></Protected>} />
       </Routes>
     </>
   );
